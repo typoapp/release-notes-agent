@@ -210,3 +210,5 @@ __marimo__/
 
 # json files
 *.json
+
+/release-notes
