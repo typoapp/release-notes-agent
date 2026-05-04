@@ -1,0 +1,55 @@
+src/releasenotes/llm/gemini.py
+  d4448d5fad226de9 1-101
+src/releasenotes/llm/base.py
+  d4448d5fad226de9 1-40
+releasenotes.yaml
+  h_cdadbffbf1e27e 1,4-8,11-16,19-21,23
+  f0f608fef342026d 2-3,9-10,17-18,22,24
+src/releasenotes/llm/anthropic.py
+  f0f608fef342026d 56-57
+  d4448d5fad226de9 1-55,58-65
+src/releasenotes/llm/registry.py
+  d4448d5fad226de9 1-17
+src/releasenotes/llm/openai.py
+  d4448d5fad226de9 1-78
+src/releasenotes/llm/__init__.py
+  d4448d5fad226de9 1-4
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "ff6ea9cece200f9c36403dd2da30113c1e1e3de2",
+  "prompts": {
+    "d4448d5fad226de9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019de2bc-31a5-7710-b3b7-575fcb9c5f39",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 2166,
+      "overriden_lines": 1
+    },
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 988,
+      "overriden_lines": 1
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
