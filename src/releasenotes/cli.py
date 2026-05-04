@@ -11,6 +11,8 @@ from rich.table import Table
 
 from .config import load_config, starter_yaml
 from .pipeline.generator import ReleaseNotePipeline
+from .schemas.change_event import ChangeEvent
+from .schemas.change_group import ChangeGroup
 
 console = Console()
 
@@ -26,6 +28,43 @@ def _parse_since(value: str) -> datetime:
     return datetime.now(timezone.utc) - delta
 
 
+def _print_fetched(events: list[ChangeEvent], groups: list[ChangeGroup]) -> None:
+    # Table 1: every raw event ingested
+    ev_table = Table(title="Fetched events", show_lines=True)
+    ev_table.add_column("Type", style="cyan", no_wrap=True)
+    ev_table.add_column("System", style="dim")
+    ev_table.add_column("ID", no_wrap=True)
+    ev_table.add_column("Title")
+    ev_table.add_column("Author", style="dim")
+    ev_table.add_column("Links", style="dim")
+
+    for e in events:
+        tickets = ", ".join(e.linked_ids.get("tickets", []))
+        prs = ", ".join(str(p) for p in e.linked_ids.get("prs", []))
+        links = " | ".join(filter(None, [f"tickets:{tickets}" if tickets else "", f"prs:{prs}" if prs else ""]))
+        ev_table.add_row(e.source_type, e.source_system, e.source_id[:12], e.title[:80], e.author_name, links or "-")
+
+    console.print(ev_table)
+
+    # Table 2: deduplication groups — shows JIRA<->GitHub correlation
+    grp_table = Table(title="Change groups (after correlation + deduplication)", show_lines=True)
+    grp_table.add_column("Group ID", style="cyan", no_wrap=True)
+    grp_table.add_column("Class", no_wrap=True)
+    grp_table.add_column("JIRA Ticket", style="green")
+    grp_table.add_column("GitHub PRs", style="blue")
+    grp_table.add_column("Commits", style="dim")
+    grp_table.add_column("Title")
+
+    for g in groups:
+        ticket = g.source_ticket.source_id if g.source_ticket else "-"
+        prs = ", ".join(f"#{p.source_id}" for p in g.source_prs) or "-"
+        commits = ", ".join(c.source_id[:7] for c in g.source_commits) or "-"
+        cls = (g.classification or "?").replace("_", " ")
+        grp_table.add_row(g.id, cls, ticket, prs, commits, g.canonical_title[:70])
+
+    console.print(grp_table)
+
+
 @click.group()
 def main():
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s %(message)s")
@@ -39,6 +78,7 @@ def main():
 @click.option("--provider", default=None, help="Override LLM provider from config")
 @click.option("--format", "formats", default=None, multiple=True)
 @click.option("--dry-run", is_flag=True, help="Skip LLM call, show classified groups")
+@click.option("--show-fetched", is_flag=True, help="Print all fetched events and their JIRA/GitHub links")
 def generate(
     from_tag: str | None,
     to_tag: str | None,
@@ -47,6 +87,7 @@ def generate(
     provider: str | None,
     formats: tuple[str, ...],
     dry_run: bool,
+    show_fetched: bool,
 ):
     if since and (from_tag or to_tag):
         raise click.UsageError("Use either --since OR --from-tag/--to-tag, not both.")
@@ -67,7 +108,12 @@ def generate(
     if formats:
         settings.output.formats = list(formats)
 
-    notes = asyncio.run(ReleaseNotePipeline(settings).generate(from_ref, to_ref, dry_run=dry_run))
+    pipeline = ReleaseNotePipeline(settings)
+    notes = asyncio.run(pipeline.generate(from_ref, to_ref, dry_run=dry_run))
+
+    if show_fetched:
+        _print_fetched(pipeline.fetched_events, pipeline.change_groups)
+
     console.print(notes.summary())
 
 

@@ -84,13 +84,15 @@ class GitHubIngestor(BaseIngestor):
 
     async def _fetch_since(self, client: httpx.AsyncClient, since: str, until: str) -> list[ChangeEvent]:
         """Fetch commits and merged PRs between two ISO datetime strings."""
+        # GitHub treats a bare date as midnight UTC — extend to end-of-day so same-day events are included
+        until_full = until if "T" in until else f"{until}T23:59:59Z"
         events: list[ChangeEvent] = []
         url: str | None = f"{self.base_url}/repos/{self.repo}/commits"
         page = 1
         while url:
             response = await self._request(
                 client, "GET", url,
-                params={"since": since, "until": until, "per_page": 100, "page": page},
+                params={"since": since, "until": until_full, "per_page": 100, "page": page},
             )
             payload = response.json()
             _write_raw_page(self.output_dir, "github", page, payload)
@@ -103,7 +105,7 @@ class GitHubIngestor(BaseIngestor):
                 events.append(_commit_event(item))
             url = _next_link(response.headers.get("Link"))
             page += 1
-        events.extend(await self._fetch_prs(client, since, until))
+        events.extend(await self._fetch_prs(client, since, until_full))
         return events
 
     async def _fetch_compare(
@@ -144,6 +146,13 @@ class GitHubIngestor(BaseIngestor):
         events: list[ChangeEvent] = []
         since_dt = _parse(since) if since else None
         until_dt = _parse(until) if until else None
+        # Normalise timezone awareness so comparisons don't raise TypeError
+        if since_dt and until_dt:
+            from datetime import timezone as _tz
+            if since_dt.tzinfo is not None and until_dt.tzinfo is None:
+                until_dt = until_dt.replace(tzinfo=_tz.utc)
+            elif since_dt.tzinfo is None and until_dt.tzinfo is not None:
+                since_dt = since_dt.replace(tzinfo=_tz.utc)
         while url:
             response = await self._request(
                 client,

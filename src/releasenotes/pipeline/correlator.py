@@ -55,6 +55,23 @@ class Correlator:
                     _add_edge(event, "tickets", ticket.id, 0.40, "author_time")
                     _add_edge(ticket, _reverse_key(event), event.id, 0.40, "author_time")
 
+        # Title-match fallback: merge commits are removed by the normalizer, so a commit like
+        # "Save Clickup Sprint MetaData" never sees "#2963" from "Merge pull request #2963".
+        # Link commits to PRs that share the same normalised title when no PR link exists yet.
+        prs_by_norm: dict[str, list[ChangeEvent]] = {}
+        for pr in prs:
+            norm = _norm_title(pr.title)
+            if len(norm) >= 6:
+                prs_by_norm.setdefault(norm, []).append(pr)
+
+        for event in events:
+            if event.source_type != "commit" or event.linked_ids.get("prs"):
+                continue
+            norm = _norm_title(event.title)
+            for pr in prs_by_norm.get(norm, []):
+                _add_edge(event, "prs", pr.id, 0.75, "title_match")
+                _add_edge(pr, "commits", event.id, 0.75, "title_match")
+
         if self.use_semantic_linking:
             self._semantic_link(candidates, tickets)
         return events
@@ -185,3 +202,8 @@ def _cheap_embedding(text: str) -> np.ndarray:
 def _cosine(left: np.ndarray, right: np.ndarray) -> float:
     denom = np.linalg.norm(left) * np.linalg.norm(right)
     return float(np.dot(left, right) / denom) if denom else 0.0
+
+
+def _norm_title(text: str) -> str:
+    """Lowercase, strip punctuation, collapse whitespace — used for title-match linking."""
+    return re.sub(r"\s+", " ", re.sub(r"[^\w\s]", "", (text or "").lower())).strip()

@@ -142,6 +142,13 @@ The merged dictionary is validated by Pydantic's `Settings.model_validate()`. Th
 
 `generate(from_ref, to_ref)` runs all stages sequentially and returns a `ReleaseNotes` dataclass.
 
+After `generate()` completes, two public attributes are available for inspection (used by `--show-fetched`):
+
+```python
+pipeline.fetched_events   # list[ChangeEvent] — all raw events from ingestion
+pipeline.change_groups    # list[ChangeGroup] — groups after deduplication + classification
+```
+
 ---
 
 ## 4. Stage 1 — Ingestion
@@ -178,6 +185,14 @@ GET /repos/{owner}/{repo}/pulls?state=closed  (filtered by the date window deriv
 ```
 
 Both modes produce `ChangeEvent` objects with `source_type="commit"` or `source_type="pr"`.
+
+**`fetch_diffs: true`** — when enabled, each commit triggers an extra API call:
+```
+GET /repos/{owner}/{repo}/commits/{sha}
+```
+This returns the full commit object including a `files` array with `filename`, `status` (added/modified/removed/renamed), `additions`, `deletions`, and the raw `patch` text. The full response is stored in `raw_payload` on the `ChangeEvent`.
+
+The `_changed_files()` helper in `generator.py` later reads these files to build the `changed_files` list sent to the LLM, after filtering out noise: lock files, `__pycache__`, migration files, minified assets, and `.github/` config. Up to 12 files are passed, sorted by status (added first).
 
 Each HTTP call uses tenacity retry logic: up to 5 attempts, exponential backoff (2s→60s), triggered on `429` or `5xx` responses.
 
@@ -247,10 +262,13 @@ event.linked_ids = {
 | `branch` | JIRA key in PR branch name (e.g. `feature/PROJ-123-...`) | 0.85 |
 | `pr_text` | JIRA key in PR title or first 500 chars of body | 0.80 |
 | `pr_number` | Commit message references `closes #42`, `(#42)`, `PR #42` | 0.90 |
+| `title_match` | Commit title exactly matches PR title (normalised: lowercase, punctuation stripped) | 0.75 |
 | `author_time` | Same author email + overlapping timestamps (fallback) | 0.40 |
 | `semantic` | Token-based cosine similarity ≥ 0.82 on titles (opt-in) | varies |
 
 Edges are **bidirectional** — both sides of a link are updated. Duplicate edges are skipped.
+
+**Why `title_match` is needed:** The normalizer removes merge commits (`Merge pull request #42 from ...`). This means the only commit that mentions a PR number is discarded, so `pr_number` linking never fires for the actual feature commits. `title_match` catches the common pattern where the feature commit and the PR share the same title (e.g., both say `"Save Clickup Sprint MetaData"`), linking them so they land in one `ChangeGroup` instead of two.
 
 The semantic linking (`use_semantic_linking: true`) uses tiktoken tokens as a 64-dimensional sparse vector with cosine similarity. It is disabled by default because it can produce false positives.
 
@@ -337,6 +355,7 @@ Two parts sent to the LLM:
 - Breaking changes must start with `⚠️ BREAKING:`
 - No hallucination — only use facts from the provided JSON
 - Write for a technical audience: PMs and developers
+- If `changed_files` is present, use the most relevant file/directory name to add one specific technical detail; ignore config, lock, and test files
 
 **User prompt** (per bucket, per chunk):
 ```
@@ -350,11 +369,26 @@ Changes (JSON):
     "ticket_id": "PROJ-412",
     "is_breaking": false,
     "authors": ["alice"],
-    "key_facts": ["Users can now sign in using their Google account."]
+    "key_facts": ["Users can now sign in using their Google account."],
+    "changed_files": ["auth/sso.py (added)", "auth/middleware.py (modified)"]
   },
   ...
 ]
 ```
+
+`changed_files` is only present when `fetch_diffs: true` and the commit payload contained file data. Groups with no diff data omit the field entirely so the prompt stays compact.
+
+### Prompt debugging
+
+Set `RN_DEBUG_PROMPTS=1` to write every LLM call to disk before it is sent:
+
+```
+release-notes/.debug_prompts/<run_id>/prompt_01.txt   # features bucket
+release-notes/.debug_prompts/<run_id>/prompt_02.txt   # improvements bucket
+...
+```
+
+Each file contains the full system prompt and the user prompt (with the JSON payload), separated by `=== SYSTEM ===` and `=== USER ===` headers. Unset the variable to stop dumping.
 
 ### Retry and validation
 
