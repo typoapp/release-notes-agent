@@ -224,14 +224,35 @@ Standup Notes — May 3, 2026
 
 ## CLI reference
 
+### `releasenotes generate`
+
 ```
 releasenotes generate --since 24h          # date-based (recommended for daily standup)
 releasenotes generate --since 2d           # last 2 days
 releasenotes generate --from-tag v1 --to-tag v2  # tag-based (GitHub only)
-releasenotes generate --since 24h --provider openai   # override LLM
+releasenotes generate --since 24h --provider openai   # override LLM provider
 releasenotes generate --since 24h --format markdown   # override output format
 releasenotes generate --since 24h --dry-run           # skip LLM, show classified groups
+releasenotes generate --since 24h --show-fetched      # print fetched events and change groups
+releasenotes generate --since 24h --dry-run --show-fetched  # combine both for full inspection
+```
 
+#### Flags
+
+| Flag | Description |
+|---|---|
+| `--since <N>h\|<N>d` | Fetch changes from the last N hours or days, e.g. `24h` or `2d` |
+| `--from-tag <tag>` | Start git tag (use with `--to-tag`; GitHub only) |
+| `--to-tag <tag>` | End git tag (use with `--from-tag`; GitHub only) |
+| `--provider <name>` | Override the LLM provider (`anthropic`, `openai`, `gemini`) |
+| `--format <name>` | Override output format (`markdown`, `slack`); repeatable |
+| `--dry-run` | Skip the LLM call; output uses commit/PR titles directly |
+| `--show-fetched` | Print two tables: all raw events fetched, and each change group after correlation and deduplication, showing which JIRA ticket links to which GitHub PRs and commits |
+| `--config <path>` | Path to config file (default: `releasenotes.yaml`) |
+
+### Other commands
+
+```
 releasenotes init        # write starter releasenotes.yaml
 releasenotes schedule    # start APScheduler background process
 releasenotes providers   # list installed plugins
