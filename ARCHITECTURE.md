@@ -142,6 +142,13 @@ The merged dictionary is validated by Pydantic's `Settings.model_validate()`. Th
 
 `generate(from_ref, to_ref)` runs all stages sequentially and returns a `ReleaseNotes` dataclass.
 
+After `generate()` completes, two public attributes are available for inspection (used by `--show-fetched`):
+
+```python
+pipeline.fetched_events   # list[ChangeEvent] — all raw events from ingestion
+pipeline.change_groups    # list[ChangeGroup] — groups after deduplication + classification
+```
+
 ---
 
 ## 4. Stage 1 — Ingestion
@@ -178,6 +185,14 @@ GET /repos/{owner}/{repo}/pulls?state=closed  (filtered by the date window deriv
 ```
 
 Both modes produce `ChangeEvent` objects with `source_type="commit"` or `source_type="pr"`.
+
+**`fetch_diffs: true`** — when enabled, each commit triggers an extra API call:
+```
+GET /repos/{owner}/{repo}/commits/{sha}
+```
+This returns the full commit object including a `files` array with `filename`, `status` (added/modified/removed/renamed), `additions`, `deletions`, and the raw `patch` text. The full response is stored in `raw_payload` on the `ChangeEvent`.
+
+The `_changed_files()` helper in `generator.py` later reads these files to build the `changed_files` list sent to the LLM, after filtering out noise: lock files, `__pycache__`, migration files, minified assets, and `.github/` config. Up to 12 files are passed, sorted by status (added first).
 
 Each HTTP call uses tenacity retry logic: up to 5 attempts, exponential backoff (2s→60s), triggered on `429` or `5xx` responses.
 

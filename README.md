@@ -16,12 +16,12 @@ JIRA (Done tickets)     ─┘
 
 | Stage | What it does |
 |---|---|
-| **Ingestion** | Fetches merged PRs and commits from GitHub, and tickets that moved to Done in JIRA, for the configured time window |
+| **Ingestion** | Fetches merged PRs and commits from GitHub, and tickets that moved to Done in JIRA, for the configured time window. With `fetch_diffs: true`, also fetches per-commit file change lists |
 | **Normalization** | Standardises labels, detects conventional commit types (`feat:`, `fix:`, etc.), filters merge commits |
-| **Correlation** | Links related records — e.g. a commit that references `PROJ-123` gets linked to that JIRA ticket |
+| **Correlation** | Links related records — e.g. a commit that references `PROJ-123` gets linked to that JIRA ticket, or a commit whose title matches a PR title is joined into the same group |
 | **Deduplication** | Groups linked records into a single `ChangeGroup` so one piece of work appears once |
 | **Classification** | Rule-based voting assigns each group to `features`, `bug_fixes`, `improvements`, or `breaking_changes` — deterministically, before the LLM is called |
-| **LLM generation** | Sends structured JSON (titles + key facts) to the LLM; writes one plain-English bullet per group |
+| **LLM generation** | Sends structured JSON (titles, key facts, and changed file names when available) to the LLM; writes one plain-English bullet per group |
 | **Output** | Writes `release-notes/YYYY-MM-DD.md` and posts a Slack message |
 
 Classification happens before the LLM so the model only writes prose — it cannot change what category a change appears in.
@@ -68,7 +68,8 @@ ingestion:
   github_repo: "owner/repo"
   jira_url: "https://yourorg.atlassian.net"
   jira_email: "you@yourorg.com"   # required for JIRA Cloud
-  jira_project: "PROJ"
+  jira_project: "PROJ"            # project key from the ticket URL, e.g. PROJ-123 → "PROJ"
+  fetch_diffs: false              # set true to include changed file names in LLM context
 
 output:
   formats: [markdown, slack]
@@ -274,7 +275,8 @@ releasenotes providers   # list installed plugins
 | `ingestion.github_repo` | — | `owner/repo` format |
 | `ingestion.jira_url` | — | Your Atlassian base URL |
 | `ingestion.jira_email` | — | Your Atlassian account email |
-| `ingestion.jira_project` | — | JIRA project key, e.g. `PROJ` |
+| `ingestion.jira_project` | — | JIRA project key — the prefix from your ticket IDs, e.g. `TM` for `TM-123` |
+| `ingestion.fetch_diffs` | `false` | Fetch per-commit file change lists; enables richer LLM bullets with file names |
 | `output.formats` | `[markdown, slack]` | Active formatters |
 | `output.output_dir` | `./release-notes` | Where markdown files are written |
 | `schedule.cron` | `0 8 * * 1-5` | Cron expression for scheduled runs |
@@ -298,6 +300,7 @@ All secrets should be set via environment variables, not in `releasenotes.yaml`.
 | `JIRA_TOKEN` | JIRA Cloud API token |
 | `JIRA_URL` | Override `ingestion.jira_url` |
 | `SLACK_WEBHOOK` | Incoming webhook URL |
+| `RN_DEBUG_PROMPTS` | Set to `1` to write every LLM prompt to `release-notes/.debug_prompts/<run_id>/prompt_NN.txt` |
 
 ---
 
