@@ -1,0 +1,29 @@
+ARCHITECTURE.md
+  f0f608fef342026d 265,271-272,358,372-373,379-392
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "5c5abb5b9368be80af0a8397d5de7487e2836872",
+  "prompts": {
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 20,
+      "total_deletions": 1,
+      "accepted_lines": 22,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/8f624f47ebfeb676f8b4adccb3e54b6464ffbee871ae985a796e168828c24a41"
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
