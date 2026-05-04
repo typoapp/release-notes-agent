@@ -1,0 +1,29 @@
+README.md
+  f0f608fef342026d 227-228,233,236-238,240-255
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "841030df1239f2d065c4ce539614563191e3035f",
+  "prompts": {
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 96,
+      "total_deletions": 2,
+      "accepted_lines": 103,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/3a8fe20afc03263a6b0ac97b81228a375dc1a5f07e371e6276c868845a87c22a"
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
