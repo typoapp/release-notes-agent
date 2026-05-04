@@ -56,12 +56,16 @@ class ReleaseNotePipeline:
         self.llm_provider = llm_provider
         self._ingestors = ingestors
         self._formatters = formatters
+        # Populated after generate() — available for inspection by callers
+        self.fetched_events: list[ChangeEvent] = []
+        self.change_groups: list[ChangeGroup] = []
 
     async def generate(self, from_tag: str, to_tag: str, dry_run: bool = False) -> ReleaseNotes:
         started = time.perf_counter()
         self._log("info", {"stage": "pipeline", "inputs": {"from_tag": from_tag, "to_tag": to_tag, "dry_run": dry_run}})
         try:
             events = await self._ingest(from_tag, to_tag)
+            self.fetched_events = events
             normalized = self._stage("normalizer", lambda: normalize(events), {"events": len(events)})
             linked = self._stage(
                 "correlator",
@@ -70,6 +74,7 @@ class ReleaseNotePipeline:
             )
             groups = self._stage("deduplicator", lambda: deduplicate(linked), {"events": len(linked)})
             groups = self._stage("classifier", lambda: classify(groups), {"groups": len(groups)})
+            self.change_groups = groups
             llm_groups = [group for group in groups if group.noise_score < 0.9]
             notes = await self._render_notes(from_tag, to_tag, llm_groups, normalized, dry_run)
             await self._write_outputs(notes)
