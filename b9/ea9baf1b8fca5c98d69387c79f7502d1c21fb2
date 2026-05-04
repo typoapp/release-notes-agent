@@ -1,0 +1,36 @@
+tests/unit/test_classifier.py
+  d4448d5fad226de9 1-68
+tests/unit/test_token_manager.py
+  d4448d5fad226de9 1-62
+tests/unit/test_correlator.py
+  d4448d5fad226de9 1-53
+tests/conftest.py
+  d4448d5fad226de9 1-7
+tests/unit/test_normalizer.py
+  d4448d5fad226de9 1-30
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b9ea9baf1b8fca5c98d69387c79f7502d1c21fb2",
+  "prompts": {
+    "d4448d5fad226de9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019de2bc-31a5-7710-b3b7-575fcb9c5f39",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 756,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
