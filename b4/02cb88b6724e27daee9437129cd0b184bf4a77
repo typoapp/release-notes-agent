@@ -1,0 +1,48 @@
+src/releasenotes/schemas/change_event.py
+  f0f608fef342026d 5
+  d4448d5fad226de9 1-4,6-31
+src/releasenotes/schemas/release_notes.py
+  d4448d5fad226de9 1-29
+src/releasenotes/schemas/change_group.py
+  d4448d5fad226de9 1-25
+src/releasenotes/schemas/__init__.py
+  d4448d5fad226de9 1-12
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "b402cb88b6724e27daee9437129cd0b184bf4a77",
+  "prompts": {
+    "d4448d5fad226de9": {
+      "agent_id": {
+        "tool": "codex",
+        "id": "019de2bc-31a5-7710-b3b7-575fcb9c5f39",
+        "model": "gpt-5.5"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 993,
+      "overriden_lines": 0
+    },
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 976,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
