@@ -1,0 +1,24 @@
+llm:
+  provider: anthropic          # anthropic | openai | gemini
+  model: claude-sonnet-4-6
+  temperature: 0.2
+  max_output_tokens: 4096
+
+ingestion:
+  sources: [github, jira]
+  github_repo: "owner/repo"    # e.g. acme/backend
+  jira_url: "https://yourorg.atlassian.net"
+  jira_email: "prateek@typoapp.io"   # required for JIRA Cloud (Basic Auth)
+  jira_project: "PROJ"
+  use_semantic_linking: false
+  fetch_diffs: false
+
+output:
+  formats: [markdown, slack]
+  output_dir: ./release-notes
+
+schedule:
+  enabled: false
+  cron: "0 8 * * 1-5"          # 8am weekdays
+  timezone: UTC
+  since_hours: 24               # how far back each scheduled run looks
