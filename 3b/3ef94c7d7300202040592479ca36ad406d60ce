@@ -1,0 +1,29 @@
+src/releasenotes/ingestion/github.py
+  f0f608fef342026d 87-88,95,108,149-155
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "3b3ef94c7d7300202040592479ca36ad406d60ce",
+  "prompts": {
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 2,
+      "accepted_lines": 17,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/be81f35f8807da8b3aaab4d516a6aae5701bef91c365e8568b9e000c252ee4a4"
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
