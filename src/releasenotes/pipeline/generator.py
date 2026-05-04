@@ -1,9 +1,11 @@
 import asyncio
 import json
 import logging
+import os
 import re
 import time
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import uuid4
 
 from ..config import Settings
@@ -38,6 +40,10 @@ STRICT RULES — violating any rule causes a retry:
    only when it is present in the JSON.
 9. Do not add introductory prose, section headers, or closing remarks.
 10. Output only a markdown list. Nothing else.
+11. If changed_files is present and non-empty, use the most relevant file or directory
+    name to add one specific detail (e.g. "in worker.py", "in the calendar module").
+    Do not list all files — pick the most meaningful one. Skip if files are only config,
+    lock, or test files.
 """
 
 
@@ -212,6 +218,8 @@ class ReleaseNotePipeline:
         return _bullets(reduced)
 
     async def _call_llm(self, user_prompt: str, groups: list[ChangeGroup], provider: BaseLLMProvider) -> str:
+        if os.getenv("RN_DEBUG_PROMPTS"):
+            _dump_prompt(self.config.output.output_dir, self.run_id, user_prompt)
         prompt = user_prompt
         for attempt in range(3):
             try:
@@ -305,14 +313,42 @@ Rules reminder:
 - Reference the id field at the end of every bullet: (cg_xxxxx)
 - Use key_facts as the basis. If key_facts is empty, turn the title into a natural,
   readable sentence without adding facts.
+- If changed_files is present, use the most relevant file or directory name to add
+  one specific technical detail. Pick the most meaningful file — not config or tests.
 - Avoid raw commit-style phrasing such as "feat:", "fix:", "chore:", "bump", or emoji
   prefixes unless they are part of a product or API name.
 - Do not speculate beyond what is in the data.
 """
 
 
+_NOISE_FILE_RE = re.compile(
+    r"(^|[/\\])(__pycache__|\.git|node_modules|\.pytest_cache|\.mypy_cache)[/\\]"
+    r"|\.pyc$"
+    r"|package-lock\.json$|yarn\.lock$|poetry\.lock$|Pipfile\.lock$|uv\.lock$"
+    r"|/migrations/\d{4}|_pb2\.py$|\.min\.(js|css)$"
+    r"|^\.github/",
+    re.IGNORECASE,
+)
+
+
+def _changed_files(group: ChangeGroup) -> list[str]:
+    """Extract meaningful changed file names from commit diffs (populated when fetch_diffs=true)."""
+    seen: dict[str, str] = {}
+    for commit in group.source_commits:
+        for f in commit.raw_payload.get("files", []):
+            name = f.get("filename", "")
+            status = f.get("status", "modified")
+            if name and not _NOISE_FILE_RE.search(name):
+                seen[name] = status
+    if not seen:
+        return []
+    order = {"added": 0, "modified": 1, "renamed": 2, "removed": 3}
+    sorted_files = sorted(seen.items(), key=lambda x: (order.get(x[1], 1), x[0]))
+    return [f"{name} ({status})" for name, status in sorted_files[:12]]
+
+
 def _payload(group: ChangeGroup) -> dict:
-    return {
+    payload: dict = {
         "id": group.id,
         "title": group.canonical_title,
         "ticket_id": group.source_ticket.source_id if group.source_ticket else None,
@@ -320,6 +356,10 @@ def _payload(group: ChangeGroup) -> dict:
         "authors": group.authors,
         "key_facts": group.key_facts,
     }
+    files = _changed_files(group)
+    if files:
+        payload["changed_files"] = files
+    return payload
 
 
 def _dry_bullet(group: ChangeGroup) -> str:
@@ -347,6 +387,15 @@ def _display_label(classification_label: str) -> str:
         "improvements": "Improvements",
         "breaking_changes": "Breaking changes",
     }.get(classification_label, classification_label.replace("_", " ").title())
+
+
+def _dump_prompt(output_dir: str, run_id: str, user_prompt: str) -> None:
+    root = Path(output_dir) / ".debug_prompts" / run_id
+    root.mkdir(parents=True, exist_ok=True)
+    index = len(list(root.glob("prompt_*.txt"))) + 1
+    path = root / f"prompt_{index:02d}.txt"
+    path.write_text(f"=== SYSTEM ===\n{SYSTEM_PROMPT}\n\n=== USER ===\n{user_prompt}\n")
+    logging.getLogger(__name__).info("Prompt dumped to %s", path)
 
 
 def _title_to_sentence(title: str) -> str:
