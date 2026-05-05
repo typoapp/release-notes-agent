@@ -1,0 +1,38 @@
+ARCHITECTURE.md
+  f0f608fef342026d 90-93,114-115,119,134,212-214,216,221-232,234,581-584,595-611,613-614
+src/releasenotes/output/slack.py
+  h_cdadbffbf1e27e 4,60
+.env.example
+  h_cdadbffbf1e27e 24
+README.md
+  f0f608fef342026d 3,5-9,76,118,121,124,129-131,147-148,159-179,212-283,341,349-350,382,388-389,407
+src/releasenotes/scheduler/cron.py
+  f0f608fef342026d 2-3,5,11,14-25,31-34,43-80
+src/releasenotes/config.py
+  f0f608fef342026d 27,44-45,76,134-135,145-146
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "073c6392208b9b84bb43f3479a21c6cb116cbde3",
+  "prompts": {
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 0,
+      "total_deletions": 0,
+      "accepted_lines": 232,
+      "overriden_lines": 0
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
