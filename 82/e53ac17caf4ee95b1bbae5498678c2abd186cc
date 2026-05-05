@@ -1,0 +1,33 @@
+src/releasenotes/ingestion/jira.py
+  f0f608fef342026d 43,50,85-92,94-105
+src/releasenotes/cli.py
+  f0f608fef342026d 32-34,45-48
+src/releasenotes/ingestion/github.py
+  f0f608fef342026d 58-91
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "82e53ac17caf4ee95b1bbae5498678c2abd186cc",
+  "prompts": {
+    "f0f608fef342026d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "bd537a16-986b-421c-8237-f48de62e9f25",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 297,
+      "total_deletions": 45,
+      "accepted_lines": 297,
+      "overriden_lines": 2,
+      "messages_url": "https://usegitai.com/cas/fe7899d3423fd88887ae9068718cf448cf0008c202839fb75254c33e92207773"
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
