@@ -1,8 +1,12 @@
 # releasenotes-agent
 
-An AI agent that automatically generates standup-ready release notes every morning by pulling completed work from GitHub and JIRA, linking related records, and using an LLM to write plain-English summaries.
+An AI agent that automatically generates release notes by pulling completed work from GitHub and JIRA, linking related records, and using an LLM to write plain-English summaries.
 
-Outputs are posted to a **Slack channel** and saved as a **Markdown file** — ready before your team's standup call.
+Supports two modes:
+- **Daily standup** — runs every morning on a schedule, covers the last 24 hours
+- **Release notes** — runs after a release, covers all work between two GitHub tags and the matching JIRA fix version
+
+Outputs are posted to a **Slack channel** and saved as a **Markdown file**.
 
 ---
 
@@ -69,6 +73,7 @@ ingestion:
   jira_url: "https://yourorg.atlassian.net"
   jira_email: "you@yourorg.com"   # required for JIRA Cloud
   jira_project: "PROJ"            # project key from the ticket URL, e.g. PROJ-123 → "PROJ"
+  jira_fix_version: ""           # JIRA release name for tag-based runs; leave empty to use --to-tag value
   fetch_diffs: false              # set true to include changed file names in LLM context
 
 output:
@@ -110,17 +115,20 @@ SLACK_WEBHOOK=https://hooks.slack.com/services/...
 ### 4. Run
 
 ```bash
-# Generate notes for the last 24 hours
+# Daily standup — last 24 hours
 releasenotes generate --since 24h
 
-# Generate notes for the last 2 days
+# Daily standup — last 2 days
 releasenotes generate --since 2d
 
-# Generate notes between two git tags (GitHub only — JIRA is skipped)
+# Release notes — all work between two GitHub tags (also queries JIRA by fix version)
 releasenotes generate --from-tag v1.0.0 --to-tag v1.1.0
 
 # Preview without calling the LLM
 releasenotes generate --since 24h --dry-run
+
+# Inspect what was fetched and how events were linked
+releasenotes generate --since 24h --show-fetched
 ```
 
 ---
@@ -136,7 +144,8 @@ schedule:
   enabled: true
   cron: "0 8 * * 1-5"    # 8am UTC, Monday–Friday
   timezone: UTC
-  since_hours: 24
+  mode: date              # date = last N hours | tag = last release tag → latest tag
+  since_hours: 24         # used only in date mode
 ```
 
 Then start it:
@@ -146,6 +155,27 @@ releasenotes schedule
 ```
 
 Keep it running with systemd, supervisord, or a container.
+
+#### Tag mode — run automatically after each release
+
+Set `mode: tag` to have the scheduler watch for new GitHub tags instead of covering a fixed time window:
+
+```yaml
+schedule:
+  enabled: true
+  cron: "0 * * * *"      # check every hour
+  timezone: UTC
+  mode: tag
+```
+
+On each tick the scheduler:
+
+1. Calls `GET /repos/{owner}/{repo}/releases/latest` (falls back to `/tags`) to find the latest tag
+2. Reads the last processed tag from `release-notes/.releasenotes_cache.json`
+3. Skips the run if the tag has not changed
+4. Runs the pipeline from the last processed tag to the new tag when a new release is detected
+
+On the very first run (no checkpoint file), the scheduler generates notes from the tag immediately before the latest one.
 
 ### Option B — Cron job
 
@@ -167,6 +197,78 @@ jobs:
       - uses: actions/checkout@v4
       - run: pip install "releasenotes-agent[anthropic]"
       - run: releasenotes generate --since 24h
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_REPO: owner/repo
+          JIRA_EMAIL: ${{ secrets.JIRA_EMAIL }}
+          JIRA_TOKEN: ${{ secrets.JIRA_TOKEN }}
+          JIRA_URL: ${{ secrets.JIRA_URL }}
+          SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK }}
+```
+
+---
+
+## Generating release notes
+
+Use `--from-tag` and `--to-tag` to generate notes for a specific release. Both GitHub and JIRA are queried.
+
+```bash
+releasenotes generate --from-tag v1.0.0 --to-tag v1.1.0
+```
+
+### How GitHub and JIRA are queried
+
+**GitHub** uses the compare API to get all commits and merged PRs between the two tags:
+```
+GET /repos/{owner}/{repo}/compare/v1.0.0...v1.1.0
+```
+
+**JIRA** queries by [Fix Version](https://support.atlassian.com/jira-software-cloud/docs/plan-and-track-a-version/) — the release label you assign to tickets in JIRA:
+```
+project = TM AND fixVersion = "v1.1.0" AND status in (Done, Closed, Resolved)
+```
+
+By default the `--to-tag` value is used as the fix version name. If your JIRA release has a different name, set `jira_fix_version` in `releasenotes.yaml`:
+
+```yaml
+ingestion:
+  jira_fix_version: "Release 1.1.0"   # overrides the --to-tag value
+```
+
+Or set it per-run via env var:
+```bash
+JIRA_FIX_VERSION="Release 1.1.0" releasenotes generate --from-tag v1.0.0 --to-tag v1.1.0
+```
+
+### JIRA key correlation
+
+If your team includes JIRA ticket keys in PR titles or commit messages, the correlator links them automatically — even if you don't use JIRA fix versions. Supported patterns:
+
+| Where | Example |
+|---|---|
+| PR title | `TM-123: Add calendar timezone support` |
+| Commit message | `Closes TM-456` or `Fixes TM-456` |
+| PR body | Any mention of `TM-123` in the description |
+| Branch name | `feature/TM-789-add-export` |
+
+When a ticket key is found and the ticket was fetched, the commit/PR and ticket are merged into a single change group. The JIRA ticket's summary and description are used as the canonical title and key facts for the LLM.
+
+### Trigger on GitHub release
+
+```yaml
+# .github/workflows/release-notes.yml
+on:
+  release:
+    types: [published]
+
+jobs:
+  release-notes:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: pip install "releasenotes-agent[anthropic]"
+      - run: releasenotes generate --from-tag ${{ github.event.release.target_commitish }} --to-tag ${{ github.event.release.tag_name }}
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -236,6 +338,7 @@ releasenotes generate --since 24h --format markdown   # override output format
 releasenotes generate --since 24h --dry-run           # skip LLM, show classified groups
 releasenotes generate --since 24h --show-fetched      # print fetched events and change groups
 releasenotes generate --since 24h --dry-run --show-fetched  # combine both for full inspection
+releasenotes generate --from-tag v1.0.0 --to-tag v1.1.0    # release notes (GitHub + JIRA fix version)
 ```
 
 #### Flags
@@ -243,8 +346,8 @@ releasenotes generate --since 24h --dry-run --show-fetched  # combine both for f
 | Flag | Description |
 |---|---|
 | `--since <N>h\|<N>d` | Fetch changes from the last N hours or days, e.g. `24h` or `2d` |
-| `--from-tag <tag>` | Start git tag (use with `--to-tag`; GitHub only) |
-| `--to-tag <tag>` | End git tag (use with `--from-tag`; GitHub only) |
+| `--from-tag <tag>` | Start git tag (use with `--to-tag`); GitHub uses compare API, JIRA queries by fix version |
+| `--to-tag <tag>` | End git tag (use with `--from-tag`); also used as the JIRA fix version name unless `jira_fix_version` is set |
 | `--provider <name>` | Override the LLM provider (`anthropic`, `openai`, `gemini`) |
 | `--format <name>` | Override output format (`markdown`, `slack`); repeatable |
 | `--dry-run` | Skip the LLM call; output uses commit/PR titles directly |
@@ -276,12 +379,14 @@ releasenotes providers   # list installed plugins
 | `ingestion.jira_url` | — | Your Atlassian base URL |
 | `ingestion.jira_email` | — | Your Atlassian account email |
 | `ingestion.jira_project` | — | JIRA project key — the prefix from your ticket IDs, e.g. `TM` for `TM-123` |
+| `ingestion.jira_fix_version` | — | JIRA release name for tag-based runs. Defaults to the `--to-tag` value if not set |
 | `ingestion.fetch_diffs` | `false` | Fetch per-commit file change lists; enables richer LLM bullets with file names |
 | `output.formats` | `[markdown, slack]` | Active formatters |
 | `output.output_dir` | `./release-notes` | Where markdown files are written |
 | `schedule.cron` | `0 8 * * 1-5` | Cron expression for scheduled runs |
 | `schedule.timezone` | `UTC` | Timezone for the cron schedule |
-| `schedule.since_hours` | `24` | How far back each scheduled run looks |
+| `schedule.mode` | `date` | `date` = last N hours; `tag` = detect new GitHub release tag and generate notes from last tag to new tag |
+| `schedule.since_hours` | `24` | How far back each run looks (used only in `date` mode) |
 
 ### Environment variables
 
@@ -299,6 +404,7 @@ All secrets should be set via environment variables, not in `releasenotes.yaml`.
 | `JIRA_EMAIL` | Atlassian account email |
 | `JIRA_TOKEN` | JIRA Cloud API token |
 | `JIRA_URL` | Override `ingestion.jira_url` |
+| `JIRA_FIX_VERSION` | Override `ingestion.jira_fix_version` for tag-based runs |
 | `SLACK_WEBHOOK` | Incoming webhook URL |
 | `RN_DEBUG_PROMPTS` | Set to `1` to write every LLM prompt to `release-notes/.debug_prompts/<run_id>/prompt_NN.txt` |
 

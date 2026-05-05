@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, timezone
 
-import httpx
+import httpx, json
 
 from ..schemas.release_notes import ReleaseNotes
 from .base import BaseFormatter
@@ -57,6 +57,7 @@ class SlackFormatter(BaseFormatter):
         async with httpx.AsyncClient() as client:
             response = await client.post(self.slack_webhook, json={"blocks": blocks}, timeout=30)
             response.raise_for_status()
+        # print(json.dumps(blocks, indent=2)) # DEBUG
         return "slack"
 
 
