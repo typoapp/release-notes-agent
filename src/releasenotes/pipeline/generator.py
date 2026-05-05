@@ -258,7 +258,7 @@ class ReleaseNotePipeline:
         output_dir = self.config.output.output_dir
         kwargs = {
             "github": {"token": ingestion.github_token, "repo": ingestion.github_repo, "output_dir": output_dir, "fetch_diffs": ingestion.fetch_diffs},
-            "jira": {"url": ingestion.jira_url, "email": ingestion.jira_email, "token": ingestion.jira_token, "project": ingestion.jira_project, "output_dir": output_dir},
+            "jira": {"url": ingestion.jira_url, "email": ingestion.jira_email, "token": ingestion.jira_token, "project": ingestion.jira_project, "fix_version": ingestion.jira_fix_version, "output_dir": output_dir},
         }
         return [get_ingestor(source, **kwargs.get(source, {})) for source in ingestion.sources]
 
@@ -369,7 +369,7 @@ def _dry_bullet(group: ChangeGroup) -> str:
 
 
 def _bullets(content: str) -> list[str]:
-    return [line.strip() for line in content.splitlines() if line.strip().startswith("-")]
+    return [line.strip() for line in content.splitlines() if line.strip().startswith(("-", "*"))]
 
 
 def _needs_review(groups: list[ChangeGroup], reason: str) -> str:
