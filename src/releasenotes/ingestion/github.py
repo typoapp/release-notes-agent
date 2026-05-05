@@ -55,6 +55,40 @@ class GitHubIngestor(BaseIngestor):
             raise IngestionError("github", f"HTTP {response.status_code}: {response.text[:200]}")
         return response
 
+    async def get_latest_tag(self) -> str | None:
+        """Return the most recently published release tag, falling back to the newest git tag."""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await self._request(client, "GET", f"{self.base_url}/repos/{self.repo}/releases/latest")
+                tag = response.json().get("tag_name")
+                if tag:
+                    return tag
+            except IngestionError:
+                pass
+            try:
+                response = await self._request(
+                    client, "GET", f"{self.base_url}/repos/{self.repo}/tags", params={"per_page": 1}
+                )
+                tags = response.json()
+                return tags[0]["name"] if tags else None
+            except IngestionError:
+                return None
+
+    async def get_previous_tag(self, current_tag: str) -> str | None:
+        """Return the tag immediately before current_tag by creation date."""
+        async with httpx.AsyncClient() as client:
+            try:
+                response = await self._request(
+                    client, "GET", f"{self.base_url}/repos/{self.repo}/tags", params={"per_page": 10}
+                )
+                tags = [t["name"] for t in response.json()]
+                if current_tag in tags:
+                    idx = tags.index(current_tag)
+                    return tags[idx + 1] if idx + 1 < len(tags) else None
+                return tags[0] if tags else None
+            except IngestionError:
+                return None
+
     async def health_check(self) -> bool:
         if not self.repo:
             return False

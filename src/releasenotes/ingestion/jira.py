@@ -40,12 +40,14 @@ class JIRAIngestor(BaseIngestor):
         project: str = "",
         output_dir: str = "./release-notes",
         email: str = "",
+        fix_version: str = "",
         **_: Any,
     ):
         self.url = url.rstrip("/")
         self.token = token
         self.project = project
         self.output_dir = output_dir
+        self.fix_version = fix_version
         self.auth = (email, token) if email else None
         self.headers = {"Accept": "application/json"}
         if token and not email:
@@ -80,20 +82,27 @@ class JIRAIngestor(BaseIngestor):
     async def fetch(self, from_ref: str, to_ref: str) -> list[ChangeEvent]:
         if not self.url or not self.project:
             raise IngestionError("jira", "jira_url and jira_project are required")
-        if not _DATE_RE.match(from_ref):
-            logger.warning(
-                "JIRA ingestor requires date-based references (e.g. --since 24h). "
-                "Got tag '%s' — skipping JIRA ingestion.",
-                from_ref,
+        if _DATE_RE.match(from_ref):
+            # Date-based mode (--since): fetch tickets updated since the given date
+            since_str = _jira_date(from_ref)
+            jql = (
+                f"project = {self.project} "
+                f'AND status in (Done, Closed, Resolved) '
+                f'AND updated >= "{since_str}" '
+                f"ORDER BY updated DESC"
             )
-            return []
-        since_str = _jira_date(from_ref)
-        jql = (
-            f"project = {self.project} "
-            f'AND status in (Done, Closed, Resolved) '
-            f'AND updated >= "{since_str}" '
-            f"ORDER BY updated DESC"
-        )
+            logger.info("JIRA: fetching by date range since %s", since_str)
+        else:
+            # Tag-based mode (--from-tag / --to-tag): fetch by fix version
+            # Uses jira_fix_version from config if set, otherwise falls back to to_ref (the GitHub to-tag)
+            fix_version = self.fix_version or to_ref
+            jql = (
+                f"project = {self.project} "
+                f'AND fixVersion = "{fix_version}" '
+                f'AND status in (Done, Closed, Resolved) '
+                f"ORDER BY updated DESC"
+            )
+            logger.info("JIRA: fetching by fix version '%s'", fix_version)
         try:
             events: list[ChangeEvent] = []
             start_at = 0
