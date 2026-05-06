@@ -125,23 +125,29 @@ def starter_yaml() -> str:
   provider: anthropic          # anthropic | openai | gemini
   model: claude-sonnet-4-6     # override if needed
   temperature: 0.2
-  max_output_tokens: 4096
+  max_output_tokens: 8192      # increase for releases with many changes
 
 ingestion:
   sources: [github, jira]
   github_repo: "owner/repo"    # e.g. acme/backend
+  github_token: ""             # GitHub personal access token (set via GITHUB_TOKEN env var)
   jira_url: "https://yourorg.atlassian.net"
+  jira_email: ""               # Atlassian account email for JIRA Cloud Basic Auth (set via JIRA_EMAIL env var)
+  jira_token: ""               # JIRA API token (set via JIRA_TOKEN env var)
   jira_project: "PROJ"         # JIRA project key (prefix from ticket IDs, e.g. TM for TM-123)
   jira_fix_version: ""         # optional: JIRA release name when using --from-tag/--to-tag (defaults to to-tag value)
+  use_semantic_linking: false  # experimental: link commits to tickets via title similarity
+  fetch_diffs: false           # fetch changed file lists per commit (slower, adds detail to notes)
 
 output:
   formats: [markdown, slack]
   output_dir: ./release-notes
+  slack_webhook: ""            # Slack incoming webhook URL (set via SLACK_WEBHOOK env var)
 
 schedule:
   enabled: false
-  cron: "0 8 * * 1-5"          # 8am weekdays
+  cron: "0 8 * * 1"            # 8am every Monday
   timezone: UTC
-  mode: date                    # date = last N hours | tag = last release tag → latest tag
+  mode: tag                    # tag = last release tag → latest tag | date = last N hours
   since_hours: 24               # used only in date mode
 """
