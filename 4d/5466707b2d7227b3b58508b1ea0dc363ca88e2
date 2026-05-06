@@ -1,0 +1,29 @@
+src/releasenotes/config.py
+  91b5e3d90d25269d 128,133,135-136,139-140,145,149,151
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.3.4",
+  "base_commit_sha": "4d5466707b2d7227b3b58508b1ea0dc363ca88e2",
+  "prompts": {
+    "91b5e3d90d25269d": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09b89a64-95e0-49ac-89b5-4add2efec71e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek",
+      "messages": [],
+      "total_additions": 11,
+      "total_deletions": 5,
+      "accepted_lines": 11,
+      "overriden_lines": 0,
+      "messages_url": "https://usegitai.com/cas/6a629d88a9a54e06434c44ab2830a12c9b46c3c359babf47549093f805319fa8"
+    }
+  },
+  "humans": {
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  }
+}
