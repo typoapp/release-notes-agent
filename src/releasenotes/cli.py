@@ -29,6 +29,9 @@ def _parse_since(value: str) -> datetime:
 
 
 def _print_fetched(events: list[ChangeEvent], groups: list[ChangeGroup]) -> None:
+    # Map internal ce_ IDs → human-readable source IDs (e.g. "RN-1", "#267", "abc1234")
+    id_to_source: dict[str, str] = {e.id: e.source_id for e in events}
+
     # Table 1: every raw event ingested
     ev_table = Table(title="Fetched events", show_lines=True)
     ev_table.add_column("Type", style="cyan", no_wrap=True)
@@ -39,8 +42,10 @@ def _print_fetched(events: list[ChangeEvent], groups: list[ChangeGroup]) -> None
     ev_table.add_column("Links", style="dim")
 
     for e in events:
-        tickets = ", ".join(e.linked_ids.get("tickets", []))
-        prs = ", ".join(str(p) for p in e.linked_ids.get("prs", []))
+        ticket_ids = [id_to_source.get(link["id"], link["id"]) for link in e.linked_ids.get("tickets", [])]
+        pr_ids = [id_to_source.get(link["id"], link["id"]) for link in e.linked_ids.get("prs", [])]
+        tickets = ", ".join(ticket_ids)
+        prs = ", ".join(pr_ids)
         links = " | ".join(filter(None, [f"tickets:{tickets}" if tickets else "", f"prs:{prs}" if prs else ""]))
         ev_table.add_row(e.source_type, e.source_system, e.source_id[:12], e.title[:80], e.author_name, links or "-")
 

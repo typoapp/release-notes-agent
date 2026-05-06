@@ -24,6 +24,7 @@ class IngestionConfig(BaseModel):
     jira_email: str = ""
     jira_token: str = ""
     jira_project: str = ""
+    jira_fix_version: str = ""   # when set, used as fixVersion in tag-based runs; defaults to to_tag
     github_token: str = ""
     github_repo: str = ""
     use_semantic_linking: bool = False
@@ -40,7 +41,8 @@ class ScheduleConfig(BaseModel):
     enabled: bool = False
     cron: str = "0 8 * * 1-5"
     timezone: str = "UTC"
-    since_hours: int = 24
+    mode: str = "date"     # "date" = last N hours | "tag" = last release tag → latest tag
+    since_hours: int = 24  # used only in date mode
 
 
 class Settings(BaseSettings):
@@ -71,6 +73,7 @@ ENV_MAP = {
     "JIRA_EMAIL": ("ingestion", "jira_email"),
     "JIRA_TOKEN": ("ingestion", "jira_token"),
     "JIRA_URL": ("ingestion", "jira_url"),
+    "JIRA_FIX_VERSION": ("ingestion", "jira_fix_version"),
     "GITHUB_TOKEN": ("ingestion", "github_token"),
     "GITHUB_REPO": ("ingestion", "github_repo"),
     "SLACK_WEBHOOK": ("output", "slack_webhook"),
@@ -128,7 +131,8 @@ ingestion:
   sources: [github, jira]
   github_repo: "owner/repo"    # e.g. acme/backend
   jira_url: "https://yourorg.atlassian.net"
-  jira_project: "PROJ"         # JIRA project key
+  jira_project: "PROJ"         # JIRA project key (prefix from ticket IDs, e.g. TM for TM-123)
+  jira_fix_version: ""         # optional: JIRA release name when using --from-tag/--to-tag (defaults to to-tag value)
 
 output:
   formats: [markdown, slack]
@@ -138,5 +142,6 @@ schedule:
   enabled: false
   cron: "0 8 * * 1-5"          # 8am weekdays
   timezone: UTC
-  since_hours: 24               # how far back each run looks
+  mode: date                    # date = last N hours | tag = last release tag → latest tag
+  since_hours: 24               # used only in date mode
 """

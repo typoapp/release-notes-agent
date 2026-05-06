@@ -87,7 +87,10 @@ to_ref   = datetime.now(UTC).date().isoformat()      # "2026-05-03"
 
 ### `--from-tag / --to-tag` mode
 
-Git tags are passed through directly. The GitHub ingestor detects them by checking whether the string starts with a `YYYY-MM-DD` pattern — if not, it uses the `/compare/{from}...{to}` API. JIRA cannot accept git tags and will skip with a warning.
+Git tags are passed through directly. Both ingestors detect the mode by checking whether `from_ref` starts with a `YYYY-MM-DD` pattern.
+
+- **GitHub** switches to the `/compare/{from}...{to}` API
+- **JIRA** switches to a fix-version JQL query instead of a date-range query (see [JIRA ingestor](#jira-ingestor))
 
 ### Mutual exclusivity
 
@@ -108,11 +111,12 @@ Loading order (later values override earlier ones):
 
 ```python
 ENV_MAP = {
-    "RN_LLM_PROVIDER": ("llm", "provider"),
-    "ANTHROPIC_API_KEY": ("llm", "api_key"),   # auto-detected by provider
+    "RN_LLM_PROVIDER":   ("llm", "provider"),
+    "ANTHROPIC_API_KEY": ("llm", "api_key"),        # auto-detected by provider
     "GITHUB_TOKEN":      ("ingestion", "github_token"),
     "JIRA_EMAIL":        ("ingestion", "jira_email"),
     "JIRA_TOKEN":        ("ingestion", "jira_token"),
+    "JIRA_FIX_VERSION":  ("ingestion", "jira_fix_version"),
     "SLACK_WEBHOOK":     ("output", "slack_webhook"),
     ...
 }
@@ -127,7 +131,7 @@ The merged dictionary is validated by Pydantic's `Settings.model_validate()`. Th
 | `LLMConfig` | Provider, model, API key, temperature, token budget |
 | `IngestionConfig` | Sources list, credentials for GitHub and JIRA |
 | `OutputConfig` | Formats list, output directory, Slack webhook |
-| `ScheduleConfig` | Cron expression, timezone, `since_hours` |
+| `ScheduleConfig` | Cron expression, timezone, `mode` (`date`\|`tag`), `since_hours` |
 
 ---
 
@@ -200,22 +204,34 @@ Raw API responses are cached to `.raw/github/YYYY-MM-DD/page_N.json` for debuggi
 
 ### JIRA ingestor
 
-Requires `from_ref` to be a date string. If a git tag is passed, it logs a warning and returns `[]`.
-
 Uses **Basic Auth** (`email:api_token`) as required by JIRA Cloud:
 ```python
 auth = (email, token)   # httpx encodes as Basic base64(email:token)
 ```
 
-JQL query:
+Detects mode from `from_ref` — the same `YYYY-MM-DD` prefix check used by the GitHub ingestor:
+
+**Date-based mode** (`--since`):
 ```
-project = PROJ
+project = TM
   AND status in (Done, Closed, Resolved)
   AND updated >= "2026-05-02 08:57"
 ORDER BY updated DESC
 ```
+The date is formatted as `YYYY-MM-DD HH:mm` (JIRA's expected JQL format, converted from the ISO 8601 `from_ref`).
 
-The date is formatted as `YYYY-MM-DD HH:mm` (JIRA's expected format, converted from the ISO 8601 `from_ref`).
+**Fix-version mode** (`--from-tag / --to-tag`):
+```
+project = TM
+  AND fixVersion = "v1.1.0"
+  AND status in (Done, Closed, Resolved)
+ORDER BY updated DESC
+```
+The fix version value is resolved in this order:
+1. `ingestion.jira_fix_version` from config (or `JIRA_FIX_VERSION` env var) — use this when the JIRA release name differs from the GitHub tag
+2. `to_ref` (the `--to-tag` value) — used automatically when `jira_fix_version` is not set
+
+A **JIRA Fix Version** is a release label assigned to tickets in JIRA (Project → Releases). When a ticket is tagged with `fixVersion = "v1.1.0"`, it means the team has committed to shipping that ticket in the v1.1.0 release. The agent queries this to find the complete set of tickets planned for a release.
 
 API endpoint: `GET /rest/api/3/search/jql` (paginated, 100 issues per page).
 
@@ -562,6 +578,10 @@ All stages emit structured JSON logs with `run_id` so errors can be correlated:
 
 Uses [APScheduler](https://apscheduler.readthedocs.io/) with an `AsyncIOScheduler` and a `CronTrigger`.
 
+The scheduler supports two modes controlled by `schedule.mode` in config.
+
+### Date mode (default)
+
 On each tick:
 
 ```python
@@ -572,6 +592,23 @@ today = now.date().isoformat()
 await ReleaseNotePipeline(config).generate(since.isoformat(), today)
 ```
 
-The scheduler runs in a foreground `asyncio` event loop and sleeps in 1-hour intervals between checks. Stop with `Ctrl-C` — `scheduler.shutdown()` is called in the `finally` block.
+### Tag mode
 
-Default schedule: `0 8 * * 1-5` — 8:00 AM UTC, Monday to Friday.
+Set `mode: tag` to have the scheduler watch for new GitHub tags. On each tick:
+
+1. Instantiates a `GitHubIngestor` and calls `get_latest_tag()`:
+   - Tries `GET /repos/{owner}/{repo}/releases/latest` first
+   - Falls back to `GET /repos/{owner}/{repo}/tags?per_page=1`
+2. Reads `last_tag` from the checkpoint file at `{output_dir}/.releasenotes_cache.json` (written by the GitHub ingestor at the end of every successful run)
+3. If no checkpoint exists (first run), calls `get_previous_tag(latest_tag)` — fetches the 10 most recent tags and returns the one immediately after `latest_tag` in the list
+4. Compares `last_tag == latest_tag` — skips if no new release
+5. Calls `ReleaseNotePipeline(config).generate(from_tag, latest_tag)` when a new tag is detected
+
+This means the scheduler is **idempotent**: running it more frequently than releases only costs a lightweight API call to check the latest tag.
+
+### Lifecycle
+
+The scheduler runs in a foreground `asyncio` event loop and sleeps in 1-hour intervals between ticks. Stop with `Ctrl-C` — `scheduler.shutdown()` is called in the `finally` block.
+
+Default schedule for date mode: `0 8 * * 1-5` — 8:00 AM UTC, Monday to Friday.
+Recommended schedule for tag mode: `0 * * * *` — check every hour.
