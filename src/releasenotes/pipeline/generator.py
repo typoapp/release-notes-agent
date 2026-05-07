@@ -44,6 +44,10 @@ STRICT RULES — violating any rule causes a retry:
     name to add one specific detail (e.g. "in worker.py", "in the calendar module").
     Do not list all files — pick the most meaningful one. Skip if files are only config,
     lock, or test files.
+12. If pr_diff_context is present, read the actual code patches to extract precise technical
+    details: new function names, renamed parameters, added API paths, removed fields, etc.
+    Use one concrete detail from the diff to make the bullet more specific and accurate.
+    Do not quote raw diff syntax (+ / - lines) — translate it into plain English.
 """
 
 
@@ -218,7 +222,7 @@ class ReleaseNotePipeline:
         return _bullets(reduced)
 
     async def _call_llm(self, user_prompt: str, groups: list[ChangeGroup], provider: BaseLLMProvider) -> str:
-        if os.getenv("RN_DEBUG_PROMPTS"):
+        if os.getenv("RN_DEBUG_PROMPTS", "").lower() not in ("", "0", "false", "no"):
             _dump_prompt(self.config.output.output_dir, self.run_id, user_prompt)
         prompt = user_prompt
         for attempt in range(3):
@@ -257,7 +261,7 @@ class ReleaseNotePipeline:
         ingestion = self.config.ingestion
         output_dir = self.config.output.output_dir
         kwargs = {
-            "github": {"token": ingestion.github_token, "repo": ingestion.github_repo, "output_dir": output_dir, "fetch_diffs": ingestion.fetch_diffs},
+            "github": {"token": ingestion.github_token, "repo": ingestion.github_repo, "output_dir": output_dir, "fetch_diffs": ingestion.fetch_diffs, "fetch_pr_diffs": ingestion.fetch_pr_diffs},
             "jira": {"url": ingestion.jira_url, "email": ingestion.jira_email, "token": ingestion.jira_token, "project": ingestion.jira_project, "fix_version": ingestion.jira_fix_version, "output_dir": output_dir},
         }
         return [get_ingestor(source, **kwargs.get(source, {})) for source in ingestion.sources]
@@ -347,6 +351,31 @@ def _changed_files(group: ChangeGroup) -> list[str]:
     return [f"{name} ({status})" for name, status in sorted_files[:12]]
 
 
+def _pr_diff_context(group: ChangeGroup) -> list[str]:
+    """Extract compact patch snippets from PR files (populated when fetch_pr_diffs=true)."""
+    candidates: list[dict] = []
+    for pr in group.source_prs:
+        for f in pr.raw_payload.get("pr_files", []):
+            name = f.get("filename", "")
+            if name and not _NOISE_FILE_RE.search(name):
+                candidates.append(f)
+    if not candidates:
+        return []
+    # Prioritise files with the most changes; cap at 5 files
+    candidates.sort(key=lambda f: f.get("changes", 0), reverse=True)
+    result: list[str] = []
+    for f in candidates[:5]:
+        name = f.get("filename", "")
+        status = f.get("status", "modified")
+        patch = f.get("patch", "")
+        if patch:
+            snippet = "\n".join(patch.splitlines()[:40])
+            result.append(f"{name} ({status}):\n{snippet}")
+        else:
+            result.append(f"{name} ({status})")
+    return result
+
+
 def _payload(group: ChangeGroup) -> dict:
     payload: dict = {
         "id": group.id,
@@ -359,6 +388,9 @@ def _payload(group: ChangeGroup) -> dict:
     files = _changed_files(group)
     if files:
         payload["changed_files"] = files
+    diff = _pr_diff_context(group)
+    if diff:
+        payload["pr_diff_context"] = diff
     return payload
 
 

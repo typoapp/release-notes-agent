@@ -198,6 +198,22 @@ This returns the full commit object including a `files` array with `filename`, `
 
 The `_changed_files()` helper in `generator.py` later reads these files to build the `changed_files` list sent to the LLM, after filtering out noise: lock files, `__pycache__`, migration files, minified assets, and `.github/` config. Up to 12 files are passed, sorted by status (added first).
 
+**`fetch_pr_diffs: true`** — when enabled, each merged PR that passes the date filter triggers an extra API call:
+```
+GET /repos/{owner}/{repo}/pulls/{pr_number}/files?per_page=30
+```
+This returns up to 30 files with `filename`, `status`, `additions`, `deletions`, `changes`, and a `patch` field containing the unified diff text. The result is stored as `pr["pr_files"]` in the PR's `raw_payload` before the `ChangeEvent` is created.
+
+The `_pr_diff_context()` helper in `generator.py` later reads these files to build the `pr_diff_context` list sent to the LLM:
+- Noise files (lock files, `__pycache__`, migrations, etc.) are filtered out
+- Up to 5 files are selected, sorted by total lines changed (most-changed first)
+- Each file contributes up to 40 lines of patch text as a compact snippet
+- The result is included in the JSON payload as `pr_diff_context` only when non-empty
+
+This gives the LLM the actual code changes to extract precise technical details — new function names, renamed parameters, added API paths, removed fields — rather than relying solely on commit messages and PR titles. It produces more accurate and specific release note bullets at the cost of additional API calls and LLM tokens per PR.
+
+To verify that PR diff data reached the LLM, run with `--show-fetched`: a **PR Diff** column shows `✓ Nf` (N files) for groups that have patch data, or `-` when the feature is off.
+
 Each HTTP call uses tenacity retry logic: up to 5 attempts, exponential backoff (2s→60s), triggered on `429` or `5xx` responses.
 
 Raw API responses are cached to `.raw/github/YYYY-MM-DD/page_N.json` for debugging.
@@ -372,6 +388,7 @@ Two parts sent to the LLM:
 - No hallucination — only use facts from the provided JSON
 - Write for a technical audience: PMs and developers
 - If `changed_files` is present, use the most relevant file/directory name to add one specific technical detail; ignore config, lock, and test files
+- If `pr_diff_context` is present, read the actual code patches to extract precise details (new function names, renamed parameters, added API paths); translate into plain English — do not quote raw diff syntax
 
 **User prompt** (per bucket, per chunk):
 ```
@@ -386,13 +403,16 @@ Changes (JSON):
     "is_breaking": false,
     "authors": ["alice"],
     "key_facts": ["Users can now sign in using their Google account."],
-    "changed_files": ["auth/sso.py (added)", "auth/middleware.py (modified)"]
+    "changed_files": ["auth/sso.py (added)", "auth/middleware.py (modified)"],
+    "pr_diff_context": [
+      "auth/sso.py (added):\n+def google_sso_callback(request):\n+    token = exchange_code(request.code)\n+    ..."
+    ]
   },
   ...
 ]
 ```
 
-`changed_files` is only present when `fetch_diffs: true` and the commit payload contained file data. Groups with no diff data omit the field entirely so the prompt stays compact.
+`changed_files` is only present when `fetch_diffs: true` and the commit payload contained file data. `pr_diff_context` is only present when `fetch_pr_diffs: true` and the PR had non-noise files with patch content. Groups with no diff data omit both fields entirely so the prompt stays compact.
 
 ### Prompt debugging
 

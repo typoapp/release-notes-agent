@@ -26,6 +26,7 @@ class GitHubIngestor(BaseIngestor):
         repo: str = "",
         output_dir: str = "./release-notes",
         fetch_diffs: bool = False,
+        fetch_pr_diffs: bool = False,
         base_url: str = "https://api.github.com",
         **_: Any,
     ):
@@ -33,6 +34,7 @@ class GitHubIngestor(BaseIngestor):
         self.repo = repo
         self.output_dir = output_dir
         self.fetch_diffs = fetch_diffs
+        self.fetch_pr_diffs = fetch_pr_diffs
         self.base_url = base_url.rstrip("/")
         self.headers = {
             "Accept": "application/vnd.github+json",
@@ -206,12 +208,26 @@ class GitHubIngestor(BaseIngestor):
                 merged_dt = _parse(merged_at)
                 if since_dt and until_dt and not (since_dt <= merged_dt <= until_dt):
                     continue
+                if self.fetch_pr_diffs:
+                    pr["pr_files"] = await self._fetch_pr_files(client, pr.get("number"))
                 events.append(_pr_event(pr))
             if since_dt and oldest_updated_at and oldest_updated_at < since_dt:
                 break
             url = _next_link(response.headers.get("Link"))
             page += 1
         return events
+
+
+    async def _fetch_pr_files(self, client: httpx.AsyncClient, pr_number: int) -> list[dict]:
+        try:
+            response = await self._request(
+                client, "GET",
+                f"{self.base_url}/repos/{self.repo}/pulls/{pr_number}/files",
+                params={"per_page": 30},
+            )
+            return response.json()
+        except Exception:
+            return []
 
 
 def _parse(value: str) -> datetime:

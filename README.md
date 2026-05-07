@@ -20,12 +20,12 @@ JIRA (Done tickets)     ─┘
 
 | Stage | What it does |
 |---|---|
-| **Ingestion** | Fetches merged PRs and commits from GitHub, and tickets that moved to Done in JIRA, for the configured time window. With `fetch_diffs: true`, also fetches per-commit file change lists |
+| **Ingestion** | Fetches merged PRs and commits from GitHub, and tickets that moved to Done in JIRA, for the configured time window. With `fetch_diffs: true`, also fetches per-commit file change lists. With `fetch_pr_diffs: true`, also fetches the full code patch for each merged PR |
 | **Normalization** | Standardises labels, detects conventional commit types (`feat:`, `fix:`, etc.), filters merge commits |
 | **Correlation** | Links related records — e.g. a commit that references `PROJ-123` gets linked to that JIRA ticket, or a commit whose title matches a PR title is joined into the same group |
 | **Deduplication** | Groups linked records into a single `ChangeGroup` so one piece of work appears once |
 | **Classification** | Rule-based voting assigns each group to `features`, `bug_fixes`, `improvements`, or `breaking_changes` — deterministically, before the LLM is called |
-| **LLM generation** | Sends structured JSON (titles, key facts, and changed file names when available) to the LLM; writes one plain-English bullet per group |
+| **LLM generation** | Sends structured JSON (titles, key facts, changed file names, and PR code patches when available) to the LLM; writes one plain-English bullet per group |
 | **Output** | Writes `release-notes/YYYY-MM-DD.md` and posts a Slack message |
 
 Classification happens before the LLM so the model only writes prose — it cannot change what category a change appears in.
@@ -75,6 +75,7 @@ ingestion:
   jira_project: "PROJ"            # project key from the ticket URL, e.g. PROJ-123 → "PROJ"
   jira_fix_version: ""           # JIRA release name for tag-based runs; leave empty to use --to-tag value
   fetch_diffs: false              # set true to include changed file names in LLM context
+  fetch_pr_diffs: false           # set true to include PR code patches in LLM context (higher accuracy, higher cost)
 
 output:
   formats: [markdown, slack]
@@ -351,7 +352,7 @@ releasenotes generate --from-tag v1.0.0 --to-tag v1.1.0    # release notes (GitH
 | `--provider <name>` | Override the LLM provider (`anthropic`, `openai`, `gemini`) |
 | `--format <name>` | Override output format (`markdown`, `slack`); repeatable |
 | `--dry-run` | Skip the LLM call; output uses commit/PR titles directly |
-| `--show-fetched` | Print two tables: all raw events fetched, and each change group after correlation and deduplication, showing which JIRA ticket links to which GitHub PRs and commits |
+| `--show-fetched` | Print two tables: all raw events fetched, and each change group after correlation and deduplication, showing which JIRA ticket links to which GitHub PRs and commits. When `fetch_pr_diffs: true` is set, a **PR Diff** column shows `✓ Nf` (N files fetched) for groups that have patch data |
 | `--config <path>` | Path to config file (default: `releasenotes.yaml`) |
 
 ### Other commands
@@ -381,6 +382,7 @@ releasenotes providers   # list installed plugins
 | `ingestion.jira_project` | — | JIRA project key — the prefix from your ticket IDs, e.g. `TM` for `TM-123` |
 | `ingestion.jira_fix_version` | — | JIRA release name for tag-based runs. Defaults to the `--to-tag` value if not set |
 | `ingestion.fetch_diffs` | `false` | Fetch per-commit file change lists; enables richer LLM bullets with file names |
+| `ingestion.fetch_pr_diffs` | `false` | Fetch the code patch for each merged PR (up to 5 files, 40 lines each); gives the LLM the actual diff to extract precise function names, parameter changes, and API paths. Higher token cost than `fetch_diffs` |
 | `output.formats` | `[markdown, slack]` | Active formatters |
 | `output.output_dir` | `./release-notes` | Where markdown files are written |
 | `schedule.cron` | `0 8 * * 1-5` | Cron expression for scheduled runs |
