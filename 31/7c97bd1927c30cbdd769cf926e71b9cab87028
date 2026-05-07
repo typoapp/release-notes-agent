@@ -1,0 +1,44 @@
+src/releasenotes/ingestion/github.py
+  s_91b5e3d90d2526::t_aeb10b387b0946 221-232
+  s_91b5e3d90d2526::t_fc08e35002e8c7 29,37
+  s_91b5e3d90d2526::t_7f509c6cb5fae5 211-212
+src/releasenotes/pipeline/generator.py
+  s_91b5e3d90d2526::t_74a97a26e4a0e0 264
+  s_91b5e3d90d2526::t_62c78292d0c535 354-378,391-393
+  s_91b5e3d90d2526::t_534a3b4299e0c2 47-50
+  s_91b5e3d90d2526::t_1f81408c88a286 225
+README.md
+  s_91b5e3d90d2526::t_980d12270604a2 78
+  s_91b5e3d90d2526::t_a425772433b319 28
+  s_91b5e3d90d2526::t_42536b7b9f42d5 23
+  s_91b5e3d90d2526::t_ef7cc3bfd35bd5 355
+  s_91b5e3d90d2526::t_d2a73a4a979903 385
+ARCHITECTURE.md
+  s_91b5e3d90d2526::t_88cdf642b5c780 391
+  s_91b5e3d90d2526::t_c7ce4df26725c9 406-409,415
+  s_91b5e3d90d2526::t_1385a91ea48b1b 201-216
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "317c97bd1927c30cbdd769cf926e71b9cab87028",
+  "prompts": {},
+  "humans": {
+    "h_82f4b64c8f1064": {
+      "author": "Prateek <prateek@typoapp.io>"
+    },
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  },
+  "sessions": {
+    "s_91b5e3d90d2526": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09b89a64-95e0-49ac-89b5-4add2efec71e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek <prateek@typoapp.io>"
+    }
+  }
+}
