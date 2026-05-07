@@ -29,6 +29,7 @@ class IngestionConfig(BaseModel):
     github_repo: str = ""
     use_semantic_linking: bool = False
     fetch_diffs: bool = False
+    fetch_pr_diffs: bool = False  # fetch per-PR file patches for richer LLM context (higher cost)
 
 
 class OutputConfig(BaseModel):
@@ -138,6 +139,7 @@ ingestion:
   jira_fix_version: ""         # optional: JIRA release name when using --from-tag/--to-tag (defaults to to-tag value)
   use_semantic_linking: false  # experimental: link commits to tickets via title similarity
   fetch_diffs: false           # fetch changed file lists per commit (slower, adds detail to notes)
+  fetch_pr_diffs: false        # fetch PR code patches for higher LLM accuracy (higher token cost)
 
 output:
   formats: [markdown, slack]

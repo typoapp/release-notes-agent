@@ -58,6 +58,7 @@ def _print_fetched(events: list[ChangeEvent], groups: list[ChangeGroup]) -> None
     grp_table.add_column("JIRA Ticket", style="green")
     grp_table.add_column("GitHub PRs", style="blue")
     grp_table.add_column("Commits", style="dim")
+    grp_table.add_column("PR Diff", no_wrap=True)
     grp_table.add_column("Title")
 
     for g in groups:
@@ -65,7 +66,10 @@ def _print_fetched(events: list[ChangeEvent], groups: list[ChangeGroup]) -> None
         prs = ", ".join(f"#{p.source_id}" for p in g.source_prs) or "-"
         commits = ", ".join(c.source_id[:7] for c in g.source_commits) or "-"
         cls = (g.classification or "?").replace("_", " ")
-        grp_table.add_row(g.id, cls, ticket, prs, commits, g.canonical_title[:70])
+        has_diff = any(pr.raw_payload.get("pr_files") for pr in g.source_prs)
+        diff_files = sum(len(pr.raw_payload.get("pr_files", [])) for pr in g.source_prs)
+        diff_indicator = f"[green]✓ {diff_files}f[/green]" if has_diff else "[dim]-[/dim]"
+        grp_table.add_row(g.id, cls, ticket, prs, commits, diff_indicator, g.canonical_title[:70])
 
     console.print(grp_table)
 
