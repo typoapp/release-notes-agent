@@ -1,0 +1,30 @@
+src/releasenotes/config.py
+  s_91b5e3d90d2526::t_72d50d097d1f25 32
+  s_91b5e3d90d2526::t_ab63e802cb9a8a 142
+src/releasenotes/cli.py
+  s_91b5e3d90d2526::t_d7901f772aa40f 61,69-72
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "29d933ec5a3eed34091221c4cfe19713bb14af5b",
+  "prompts": {},
+  "humans": {
+    "h_82f4b64c8f1064": {
+      "author": "Prateek <prateek@typoapp.io>"
+    },
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  },
+  "sessions": {
+    "s_91b5e3d90d2526": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09b89a64-95e0-49ac-89b5-4add2efec71e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek <prateek@typoapp.io>"
+    }
+  }
+}
