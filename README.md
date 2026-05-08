@@ -69,7 +69,8 @@ llm:
 
 ingestion:
   sources: [github, jira]
-  github_repo: "owner/repo"
+  github_repos:                  # add more repos to include multiple services
+    - "owner/repo"
   jira_url: "https://yourorg.atlassian.net"
   jira_email: "you@yourorg.com"   # required for JIRA Cloud
   jira_project: "PROJ"            # project key from the ticket URL, e.g. PROJ-123 → "PROJ"
@@ -376,7 +377,8 @@ releasenotes providers   # list installed plugins
 | `llm.temperature` | `0.2` | Lower = more consistent output |
 | `llm.max_output_tokens` | `4096` | Max tokens in LLM response |
 | `ingestion.sources` | `[github, jira]` | Active ingestors |
-| `ingestion.github_repo` | — | `owner/repo` format |
+| `ingestion.github_repos` | — | List of `owner/repo` strings to include — one ingestor per repo runs concurrently |
+| `ingestion.github_repo` | — | Single `owner/repo` (backward compat); merged into `github_repos` automatically |
 | `ingestion.jira_url` | — | Your Atlassian base URL |
 | `ingestion.jira_email` | — | Your Atlassian account email |
 | `ingestion.jira_project` | — | JIRA project key — the prefix from your ticket IDs, e.g. `TM` for `TM-123` |
@@ -402,7 +404,8 @@ All secrets should be set via environment variables, not in `releasenotes.yaml`.
 | `RN_LLM_PROVIDER` | Override `llm.provider` |
 | `RN_LLM_MODEL` | Override `llm.model` |
 | `GITHUB_TOKEN` | GitHub personal access token |
-| `GITHUB_REPO` | Override `ingestion.github_repo` |
+| `GITHUB_REPO` | Override `ingestion.github_repo` (single repo) |
+| `GITHUB_REPOS` | Comma-separated list overriding `ingestion.github_repos`, e.g. `owner/api,owner/frontend` |
 | `JIRA_EMAIL` | Atlassian account email |
 | `JIRA_TOKEN` | JIRA Cloud API token |
 | `JIRA_URL` | Override `ingestion.jira_url` |
