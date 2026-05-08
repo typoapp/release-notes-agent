@@ -1,0 +1,35 @@
+src/releasenotes/config.py
+  s_91b5e3d90d2526::t_4fc3e28324bf34 29-30,35-40
+  s_91b5e3d90d2526::t_4e9ae1b3824afc 87
+  s_91b5e3d90d2526::t_fb27e3a47ec2d9 7
+  s_91b5e3d90d2526::t_7749f4fbdeb34b 121-126
+  s_91b5e3d90d2526::t_fd35a8ecb31357 147-148
+src/releasenotes/pipeline/generator.py
+  s_91b5e3d90d2526::t_d08840a3e30dea 263-287
+src/releasenotes/scheduler/cron.py
+  s_91b5e3d90d2526::t_499f7a6dc3bbc0 53-57,61
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.4.1",
+  "base_commit_sha": "760db9c1a48d6fb1ed20a3589877d4a0d37d50fc",
+  "prompts": {},
+  "humans": {
+    "h_82f4b64c8f1064": {
+      "author": "Prateek <prateek@typoapp.io>"
+    },
+    "h_cdadbffbf1e27e": {
+      "author": "Prateek"
+    }
+  },
+  "sessions": {
+    "s_91b5e3d90d2526": {
+      "agent_id": {
+        "tool": "claude",
+        "id": "09b89a64-95e0-49ac-89b5-4add2efec71e",
+        "model": "claude-sonnet-4-6"
+      },
+      "human_author": "Prateek <prateek@typoapp.io>"
+    }
+  }
+}
