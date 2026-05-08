@@ -260,11 +260,31 @@ class ReleaseNotePipeline:
     def _build_ingestors(self) -> list[BaseIngestor]:
         ingestion = self.config.ingestion
         output_dir = self.config.output.output_dir
-        kwargs = {
-            "github": {"token": ingestion.github_token, "repo": ingestion.github_repo, "output_dir": output_dir, "fetch_diffs": ingestion.fetch_diffs, "fetch_pr_diffs": ingestion.fetch_pr_diffs},
-            "jira": {"url": ingestion.jira_url, "email": ingestion.jira_email, "token": ingestion.jira_token, "project": ingestion.jira_project, "fix_version": ingestion.jira_fix_version, "output_dir": output_dir},
-        }
-        return [get_ingestor(source, **kwargs.get(source, {})) for source in ingestion.sources]
+        ingestors: list[BaseIngestor] = []
+        for source in ingestion.sources:
+            if source == "github":
+                for repo in ingestion.github_repos:
+                    ingestors.append(get_ingestor(
+                        "github",
+                        token=ingestion.github_token,
+                        repo=repo,
+                        output_dir=output_dir,
+                        fetch_diffs=ingestion.fetch_diffs,
+                        fetch_pr_diffs=ingestion.fetch_pr_diffs,
+                    ))
+            elif source == "jira":
+                ingestors.append(get_ingestor(
+                    "jira",
+                    url=ingestion.jira_url,
+                    email=ingestion.jira_email,
+                    token=ingestion.jira_token,
+                    project=ingestion.jira_project,
+                    fix_version=ingestion.jira_fix_version,
+                    output_dir=output_dir,
+                ))
+            else:
+                ingestors.append(get_ingestor(source, output_dir=output_dir))
+        return ingestors
 
     async def _write_outputs(self, notes: ReleaseNotes) -> None:
         formatters = self._formatters if self._formatters is not None else self._build_formatters()

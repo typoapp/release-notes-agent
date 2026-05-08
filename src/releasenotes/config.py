@@ -4,7 +4,7 @@ from typing import Any
 
 import yaml
 from dotenv import load_dotenv
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from .exceptions import ConfigError
@@ -26,10 +26,18 @@ class IngestionConfig(BaseModel):
     jira_project: str = ""
     jira_fix_version: str = ""   # when set, used as fixVersion in tag-based runs; defaults to to_tag
     github_token: str = ""
-    github_repo: str = ""
+    github_repo: str = ""        # single-repo (backward compat); prefer github_repos
+    github_repos: list[str] = Field(default_factory=list)  # one or more owner/repo strings
     use_semantic_linking: bool = False
     fetch_diffs: bool = False
     fetch_pr_diffs: bool = False  # fetch per-PR file patches for richer LLM context (higher cost)
+
+    @model_validator(mode="after")
+    def _coerce_repos(self) -> "IngestionConfig":
+        # Fold single github_repo into github_repos so the rest of the code only reads one field.
+        if self.github_repo and self.github_repo not in self.github_repos:
+            self.github_repos = [self.github_repo] + list(self.github_repos)
+        return self
 
 
 class OutputConfig(BaseModel):
@@ -76,7 +84,7 @@ ENV_MAP = {
     "JIRA_URL": ("ingestion", "jira_url"),
     "JIRA_FIX_VERSION": ("ingestion", "jira_fix_version"),
     "GITHUB_TOKEN": ("ingestion", "github_token"),
-    "GITHUB_REPO": ("ingestion", "github_repo"),
+    "GITHUB_REPO": ("ingestion", "github_repo"),   # single-repo override
     "SLACK_WEBHOOK": ("output", "slack_webhook"),
 }
 
@@ -110,6 +118,12 @@ def _apply_env(data: dict[str, Any]) -> None:
     for env, (section, key) in ENV_MAP.items():
         if os.getenv(env) is not None:
             _set(data, section, key, os.getenv(env, ""))
+    # GITHUB_REPOS accepts a comma-separated list and overrides github_repos entirely.
+    github_repos_env = os.getenv("GITHUB_REPOS")
+    if github_repos_env:
+        repos = [r.strip() for r in github_repos_env.split(",") if r.strip()]
+        if repos:
+            _set(data, "ingestion", "github_repos", repos)
 
 
 def _get(data: dict[str, Any], section: str, key: str) -> Any:
@@ -130,7 +144,8 @@ def starter_yaml() -> str:
 
 ingestion:
   sources: [github, jira]
-  github_repo: "owner/repo"    # e.g. acme/backend
+  github_repos:                  # one or more owner/repo values; use a single item for one repo
+    - "owner/repo"               # e.g. acme/backend
   github_token: ""             # GitHub personal access token (set via GITHUB_TOKEN env var)
   jira_url: "https://yourorg.atlassian.net"
   jira_email: ""               # Atlassian account email for JIRA Cloud Basic Auth (set via JIRA_EMAIL env var)

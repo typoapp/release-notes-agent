@@ -50,10 +50,15 @@ async def _run_date_mode(config: Settings) -> None:
 
 
 async def _run_tag_mode(config: Settings) -> None:
+    repos = config.ingestion.github_repos
+    if not repos:
+        logger.warning("scheduler: no github_repos configured, skipping run")
+        return
+    # Use the first repo as the canonical source for release tag detection.
     ingestor = get_ingestor(
         "github",
         token=config.ingestion.github_token,
-        repo=config.ingestion.github_repo,
+        repo=repos[0],
         output_dir=config.output.output_dir,
     )
     latest_tag = await ingestor.get_latest_tag()
